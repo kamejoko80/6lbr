@@ -329,7 +329,7 @@ set_channel(uint8_t channel)
   freq = (uint16_t)(new_freq / 1000);
   frac = (new_freq - (freq * 1000)) * 65536 / 1000;
 
-  PRINTF("set_channel: %u = 0x%04x.0x%04x (%lu)\n", channel, freq, frac,
+  printf("set_channel: %u = 0x%04x.0x%04x (%lu)\n", channel, freq, frac,
          new_freq);
 
   smartrf_settings_cmd_prop_radio_div_setup.centerFreq = freq;

@@ -33,12 +33,21 @@
 /*---------------------------------------------------------------------------*/
 /* Change to match your configuration */
 #define IEEE802154_CONF_PANID            0xABCD
-#define RF_CORE_CONF_CHANNEL                 25
+#define RF_CORE_CONF_CHANNEL                 0
 #define RF_BLE_CONF_ENABLED                   1
 /*---------------------------------------------------------------------------*/
 /* Enable/Disable Components of this Demo */
 #define CC26XX_WEB_DEMO_CONF_MQTT_CLIENT      1
 #define CC26XX_WEB_DEMO_CONF_6LBR_CLIENT      1
+
+#undef NETSTACK_CONF_RDC
+#define NETSTACK_CONF_RDC                     nullrdc_driver
+
+// Enable DAO-Ack
+#define RPL_CONF_WITH_DAO_ACK                 1
+#define RPL_CONF_RPL_REPAIR_ON_DAO_NACK       0
+#define RPL_CONF_DIO_REFRESH_DAO_ROUTES       0
+
 #define CC26XX_WEB_DEMO_CONF_COAP_SERVER      1
 #define CC26XX_WEB_DEMO_CONF_NET_UART         1
 
@@ -56,7 +65,7 @@
  * Shrink the size of the uIP buffer, routing table and ND cache.
  * Set the TCP MSS
  */
-#define UIP_CONF_BUFFER_SIZE                900
+#define UIP_CONF_BUFFER_SIZE                600
 #define NBR_TABLE_CONF_MAX_NEIGHBORS          5
 #define UIP_CONF_MAX_ROUTES                   5
 #define UIP_CONF_TCP_MSS                    128
