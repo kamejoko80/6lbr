@@ -94,20 +94,29 @@ static uint8_t connect_attempt;
 /*---------------------------------------------------------------------------*/
 /* Various states */
 static uint8_t state;
-#define MQTT_CLIENT_STATE_INIT            0
-#define MQTT_CLIENT_STATE_REGISTERED      1
-#define MQTT_CLIENT_STATE_CONNECTING      2
-#define MQTT_CLIENT_STATE_CONNECTED       3
-#define MQTT_CLIENT_STATE_PUBLISHING      4
-#define MQTT_CLIENT_STATE_DISCONNECTED    5
-#define MQTT_CLIENT_STATE_NEWCONFIG       6
-#define MQTT_CLIENT_STATE_CONFIG_ERROR 0xFE
-#define MQTT_CLIENT_STATE_ERROR        0xFF
+#define MQTT_CLIENT_STATE_INIT                      0
+#define MQTT_CLIENT_STATE_REGISTERED                1
+#define MQTT_CLIENT_STATE_CONNECTING                2
+#define MQTT_CLIENT_STATE_CONNECTED                 3
+#define MQTT_CLIENT_STATE_PUBLISHING                4
+#define MQTT_CLIENT_STATE_DISCONNECTED              5
+#define MQTT_CLIENT_STATE_NEWCONFIG                 6
+#define MQTT_CLIENT_STATE_CONFIG_ERROR              0xFE
+#define MQTT_CLIENT_STATE_ERROR                     0xFF
 
 /* TBD */
-#define CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER 1
-#define CC26XX_WEB_DEMO_NET_CONNECT_PERIODIC 1 
-#define CC26XX_WEB_DEMO_STATUS_LED           1
+#define CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER        1
+#define CC26XX_WEB_DEMO_NET_CONNECT_PERIODIC        1 
+#define CC26XX_WEB_DEMO_STATUS_LED                  1
+
+#define CC26XX_WEB_DEMO_DEFAULT_ORG_ID              "quickstart"
+#define CC26XX_WEB_DEMO_DEFAULT_TYPE_ID             "cc13xx"
+#define CC26XX_WEB_DEMO_DEFAULT_EVENT_TYPE_ID       "status"
+#define CC26XX_WEB_DEMO_DEFAULT_SUBSCRIBE_CMD_TYPE  "+"
+#define CC26XX_WEB_DEMO_DEFAULT_BROKER_PORT         1883
+#define CC26XX_WEB_DEMO_DEFAULT_PUBLISH_INTERVAL    (30 * CLOCK_SECOND)
+#define CC26XX_WEB_DEMO_DEFAULT_KEEP_ALIVE_TIMER    60
+#define CC26XX_WEB_DEMO_DEFAULT_RSSI_MEAS_INTERVAL  (CLOCK_SECOND * 30)
 
 /*---------------------------------------------------------------------------*/
 /* Maximum TCP segment size for outgoing segments of our socket */
@@ -147,21 +156,19 @@ static uip_ip6addr_t def_route;
 /* Parent RSSI functionality */
 extern int def_rt_rssi;
 /*---------------------------------------------------------------------------*/
-const static cc26xx_web_demo_sensor_reading_t *reading;
-/*---------------------------------------------------------------------------*/
 mqtt_client_config_t *conf;
 /*---------------------------------------------------------------------------*/
-PROCESS(mqtt_client_process, "CC26XX MQTT Client");
+//PROCESS(mqtt_client_process, "CC26XX MQTT Client");
+PROCESS_NAME(mqtt_client_process);
+
 /*---------------------------------------------------------------------------*/
-static void
-publish_led_off(void *d)
+static void publish_led_off(void *d)
 {
   leds_off(CC26XX_WEB_DEMO_STATUS_LED);
 }
 
 /*---------------------------------------------------------------------------*/
-static void
-pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
+static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
             uint16_t chunk_len)
 {
   DBG("Pub Handler: topic='%s' (len=%u), chunk_len=%u\n", topic, topic_len,
@@ -198,9 +205,9 @@ pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
   }
 #endif
 }
+
 /*---------------------------------------------------------------------------*/
-static void
-mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data)
+static void mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data)
 {
   switch(event) {
   case MQTT_EVENT_CONNECTED: {
@@ -251,9 +258,9 @@ mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data)
     break;
   }
 }
+
 /*---------------------------------------------------------------------------*/
-static int
-construct_pub_topic(void)
+static int construct_pub_topic(void)
 {
   int len = snprintf(pub_topic, BUFFER_SIZE, "iot-2/evt/%s/fmt/json",
                      conf->event_type_id);
@@ -266,9 +273,9 @@ construct_pub_topic(void)
 
   return 1;
 }
+
 /*---------------------------------------------------------------------------*/
-static int
-construct_sub_topic(void)
+static int construct_sub_topic(void)
 {
   int len = snprintf(sub_topic, BUFFER_SIZE, "iot-2/cmd/%s/fmt/json",
                      conf->cmd_type);
@@ -281,9 +288,9 @@ construct_sub_topic(void)
 
   return 1;
 }
+
 /*---------------------------------------------------------------------------*/
-static int
-construct_client_id(void)
+static int construct_client_id(void)
 {
   int len = snprintf(client_id, BUFFER_SIZE, "d:%s:%s:%02x%02x%02x%02x%02x%02x",
                      conf->org_id, conf->type_id,
@@ -299,9 +306,9 @@ construct_client_id(void)
 
   return 1;
 }
+
 /*---------------------------------------------------------------------------*/
-static void
-update_config(void)
+static void update_config(void)
 {
   if(construct_client_id() == 0) {
     /* Fatal error. Client ID larger than the buffer */
@@ -338,9 +345,9 @@ update_config(void)
 
   return;
 }
+
 /*---------------------------------------------------------------------------*/
-static int
-init_config()
+static int init_config()
 {
   /* Populate configuration with default values */
   memset(conf, 0, sizeof(mqtt_client_config_t));
@@ -358,8 +365,7 @@ init_config()
 }
 
 /*---------------------------------------------------------------------------*/
-static void
-subscribe(void)
+static void subscribe(void)
 {
   /* Publish MQTT topic in IBM quickstart format */
   mqtt_status_t status;
@@ -371,74 +377,11 @@ subscribe(void)
     DBG("APP - Tried to subscribe but command queue was full!\n");
   }
 }
+
 /*---------------------------------------------------------------------------*/
-static void
-publish(void)
+static void publish(void)
 {
   /* Publish MQTT topic in IBM quickstart format */
-  int len;
-  int remaining = APP_BUFFER_SIZE;
-  char def_rt_str[64];
-
-  seq_nr_value++;
-
-  buf_ptr = app_buffer;
-
-  len = snprintf(buf_ptr, remaining,
-                 "{"
-                 "\"d\":{"
-                 "\"myName\":\"%s\","
-                 "\"Seq #\":%d,"
-                 "\"Uptime (sec)\":%lu",
-                 BOARD_STRING, seq_nr_value, clock_seconds());
-
-  if(len < 0 || len >= remaining) {
-    printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
-    return;
-  }
-
-  remaining -= len;
-  buf_ptr += len;
-
-  /* Put our Default route's string representation in a buffer */
-  memset(def_rt_str, 0, sizeof(def_rt_str));
-  cc26xx_web_demo_ipaddr_sprintf(def_rt_str, sizeof(def_rt_str),
-                                 uip_ds6_defrt_choose());
-
-  len = snprintf(buf_ptr, remaining, ",\"Def Route\":\"%s\",\"RSSI (dBm)\":%d",
-                 def_rt_str, def_rt_rssi);
-
-  if(len < 0 || len >= remaining) {
-    printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
-    return;
-  }
-  remaining -= len;
-  buf_ptr += len;
-
-  memcpy(&def_route, uip_ds6_defrt_choose(), sizeof(uip_ip6addr_t));
-
-  for(reading = cc26xx_web_demo_sensor_first();
-      reading != NULL; reading = reading->next) {
-    if(reading->publish && reading->raw != CC26XX_SENSOR_READING_ERROR) {
-      len = snprintf(buf_ptr, remaining,
-                     ",\"%s (%s)\":%s", reading->descr, reading->units,
-                     reading->converted);
-
-      if(len < 0 || len >= remaining) {
-        printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
-        return;
-      }
-      remaining -= len;
-      buf_ptr += len;
-    }
-  }
-
-  len = snprintf(buf_ptr, remaining, "}}");
-
-  if(len < 0 || len >= remaining) {
-    printf("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
-    return;
-  }
 
   mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
                strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);
@@ -446,8 +389,7 @@ publish(void)
   DBG("APP - Publish!\n");
 }
 /*---------------------------------------------------------------------------*/
-static void
-connect_to_broker(void)
+static void connect_to_broker(void)
 {
   /* Connect to MQTT server */
   mqtt_status_t conn_attempt_result = mqtt_connect(&conn, conf->broker_ip,
@@ -460,9 +402,9 @@ connect_to_broker(void)
     state = MQTT_CLIENT_STATE_CONFIG_ERROR;
   }
 }
+
 /*---------------------------------------------------------------------------*/
-static void
-state_machine(void)
+static void state_machine(void)
 {
   switch(state) {
   case MQTT_CLIENT_STATE_INIT:
@@ -613,6 +555,7 @@ state_machine(void)
   /* If we didn't return so far, reschedule ourselves */
   etimer_set(&publish_periodic_timer, STATE_MACHINE_PERIODIC);
 }
+
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(mqtt_client_process, ev, data)
 {
@@ -642,6 +585,7 @@ PROCESS_THREAD(mqtt_client_process, ev, data)
       }
     }
 
+    #if 0 /* TBD */
     if(ev == httpd_simple_event_new_config) {
       /*
        * Schedule next pass in a while. When HTTPD sends us this event, it is
@@ -650,10 +594,11 @@ PROCESS_THREAD(mqtt_client_process, ev, data)
        */
       etimer_set(&publish_periodic_timer, NEW_CONFIG_WAIT_INTERVAL);
     }
-
+    #endif
+    
     if((ev == PROCESS_EVENT_TIMER && data == &publish_periodic_timer) ||
        ev == PROCESS_EVENT_POLL ||
-       ev == cc26xx_web_demo_publish_event ||
+        /* ev == cc26xx_web_demo_publish_event || */
        (ev == sensors_event && data == CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER)) {
       state_machine();
     }
@@ -669,6 +614,10 @@ PROCESS_THREAD(mqtt_client_process, ev, data)
 
   PROCESS_END();
 }
+
+/*---------------------------------------------------------------------------*/
+AUTOSTART_PROCESSES(&mqtt_client_process);
+
 /*---------------------------------------------------------------------------*/
 /**
  * @}
