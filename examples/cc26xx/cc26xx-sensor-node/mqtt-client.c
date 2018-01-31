@@ -425,6 +425,25 @@ HTTPD_SIMPLE_POST_HANDLER(reconnect, reconnect_post_handler);
 static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
             uint16_t chunk_len)
 {
+#if 1
+
+  printf("Pub Handler: topic='%s' (len=%u), chunk='%s' (len=%u)\n", 
+         topic, topic_len, chunk, chunk_len);
+
+  /* Turn om/off the LED */ 
+  if(strcmp(chunk, "led_on") == 0)
+  {
+    leds_on(LEDS_RED);
+	printf("Turn on LED RED\n");
+  }
+
+  if(strcmp(chunk, "led_off") == 0)
+  {
+    leds_off(LEDS_RED);
+	printf("Turn off LED RED\n");
+  }	  
+
+#else
   printf("Pub Handler: topic='%s' (len=%u), chunk_len=%u\n", topic, topic_len,
       chunk_len);
 
@@ -457,6 +476,7 @@ static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *ch
     }
     return;
   }
+#endif
 #endif
 }
 
@@ -638,9 +658,13 @@ static void subscribe(void)
   /* Publish MQTT topic in IBM quickstart format */
   mqtt_status_t status;
 
+  /* Temporaly we change the topic */
+  memset(sub_topic, 0, BUFFER_SIZE);
+  memcpy(sub_topic, "control", strlen("control"));
+  
   status = mqtt_subscribe(&conn, NULL, sub_topic, MQTT_QOS_LEVEL_0);
 
-  printf("APP - Subscribing!\n");
+  printf("APP - Subscribing topic: %s\n", sub_topic);
   if(status == MQTT_STATUS_OUT_QUEUE_FULL) {
     printf("APP - Tried to subscribe but command queue was full!\n");
   }
@@ -788,11 +812,19 @@ static void state_machine(void)
     printf("Connecting %s (%u)\n", conf->broker_ip, connect_attempt);
     break;
   case MQTT_CLIENT_STATE_CONNECTED:
+
+#if 0  
     /* Don't subscribe unless we are a registered device */
     if(strncasecmp(conf->org_id, QUICKSTART, strlen(conf->org_id)) == 0) {
       printf("Using 'quickstart': Skipping subscribe\n");
       state = MQTT_CLIENT_STATE_PUBLISHING;
     }
+#else
+    /* Subcrible a topic */
+    subscribe();
+    state = MQTT_CLIENT_STATE_PUBLISHING;	
+#endif
+
     /* Continue */
   case MQTT_CLIENT_STATE_PUBLISHING:
     /* If the timer expired, the connection is stable. */
